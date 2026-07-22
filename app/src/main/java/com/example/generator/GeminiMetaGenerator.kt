@@ -302,7 +302,7 @@ class GeminiMetaGenerator {
                         lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - ${if (response.code == 503) "النموذج يواجه ضغطاً كبيراً، يرجى المحاولة لاحقاً أو تغيير النموذج" else "تم استنفاد الحد الأقصى"}")
                         continue
                     } else {
-                        lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - غير معروف")
+                        if (response.code == 403) lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "تم حظر مفتاح API (خطأ 403). الرجاء التأكد من صحة المفتاح أو إنشاء مفتاح جديد.") else lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - غير معروف")
                         break // Other HTTP error, no retry
                     }
                 }

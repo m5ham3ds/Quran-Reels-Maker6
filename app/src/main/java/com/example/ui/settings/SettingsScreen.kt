@@ -73,12 +73,13 @@ fun SettingsScreen(
     val videoQuality by settingsManager.videoQuality.collectAsState(initial = "Ultra")
     val videoFps by settingsManager.videoFps.collectAsState(initial = 30)
     val backgroundKeywords by settingsManager.backgroundKeywords.collectAsState(initial = emptySet())
-    val backgroundKeywordsPrompt by settingsManager.backgroundKeywordsPrompt.collectAsState(initial = "")
+
     val isArabic = language == "ar"
     
     var showInlineDiagnostics by remember { mutableStateOf(false) }
     var logsList by remember { mutableStateOf(emptyList<String>()) }
     var showKeywordPromptDialog by remember { mutableStateOf(false) }
+    val backgroundKeywordsPrompt by settingsManager.backgroundKeywordsPrompt.collectAsState(initial = "")
     
     LaunchedEffect(showInlineDiagnostics) {
         if (showInlineDiagnostics) {
@@ -425,16 +426,26 @@ fun SettingsScreen(
                     }
                 }
             }
-
             // Section 1.5: Background Search Keywords
-            Text(
-                text = if (isArabic) "كلمات البحث للخلفيات" else "Background Search Keywords",
-                color = LuxuryGold,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, end = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isArabic) "كلمات البحث للخلفيات" else "Background Search Keywords",
+                    color = LuxuryGold,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    letterSpacing = 0.5.sp
+                )
+                IconButton(
+                    onClick = { showKeywordPromptDialog = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Prompt", tint = LuxuryGold)
+                }
+            }
 
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -547,13 +558,9 @@ fun SettingsScreen(
                             Spacer(Modifier.width(6.dp))
                             Text(if (isArabic) "حذف الكل" else "Clear All")
                         }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Button(
-                                enabled = !isGenerating,
+
+                        Button(
+                            enabled = !isGenerating,
                             onClick = {
                                 if (isGenerating) return@Button
                                 val currentGeminiKey = if (geminiKey.isNotBlank()) geminiKey else com.example.BuildConfig.GEMINI_API_KEY
@@ -625,6 +632,16 @@ fun SettingsScreen(
                                                 kotlinx.coroutines.delay(2000L * attempt)
                                             } else {
                                                 val errorBody = response.body?.string() ?: ""
+                                                if (response.code == 403) {
+                                                    withContext(Dispatchers.Main) {
+                                                        android.widget.Toast.makeText(context, if (isArabic) "مفتاح API محظور أو تم تسريبه (خطأ 403). يرجى إنشاء مفتاح جديد." else "API key blocked or leaked (403). Please get a new one.", android.widget.Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
+                                                if (response.code == 403) {
+                                                    withContext(Dispatchers.Main) {
+                                                        android.widget.Toast.makeText(context, if (isArabic) "مفتاح API محظور أو تم تسريبه (خطأ 403). يرجى تغييره من Google AI Studio." else "API key blocked or leaked (403). Please get a new one.", android.widget.Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
                                                 com.example.generator.SystemDiagnosticTracker.addLog("ERROR", "فشل الاتصال: رمز الاستجابة ${response.code}، التفاصيل: $errorBody")
                                                 withContext(Dispatchers.Main) {
                                                     android.widget.Toast.makeText(context, if (isArabic) "فشل الاتصال: ${response.code}\n$errorBody" else "Connection failed: ${response.code}\n$errorBody", android.widget.Toast.LENGTH_LONG).show()
@@ -641,8 +658,7 @@ fun SettingsScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x334CAF50), contentColor = Color(0xFF81C784)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             if (isGenerating) {
                                 CircularProgressIndicator(color = Color(0xFF81C784), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -651,14 +667,6 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.width(6.dp))
                             Text(if (isArabic) "توليد بالذكاء الاصطناعي" else "AI Auto Fill")
-                        }
-                        
-                        IconButton(
-                            onClick = { showKeywordPromptDialog = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Prompt", tint = TextSoftColor)
-                        }
                         }
                     }
                 }
@@ -1026,7 +1034,7 @@ fun SettingsScreen(
             }
         }
     }
-    
+
     if (showKeywordPromptDialog) {
         var editablePrompt by remember { mutableStateOf(backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." }) }
         
