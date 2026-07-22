@@ -137,8 +137,8 @@ class GeminiMetaGenerator {
             لدينا مقطع فيديو/صوت بهذا الرابط: [URL]
             والنص المستخرج منه (إن وجد): "[WHISPER_TEXT]"
             وبعض البيانات الوصفية من الفيديو (العنوان، الوصف، الكلمات المفتاحية):
-            $videoInfo
-            ملاحظة (إن وجدت مشكلة في جلب النص): $whisperError
+            [VIDEO_INFO]
+            ملاحظة (إن وجدت مشكلة في جلب النص): [ERROR]
             
             يرجى تحليل النص المستخرج (أو الاعتماد على الرابط والبيانات الوصفية) لاستخراج المعلومات التالية:
             1. رقم السورة (1 إلى 114).
@@ -166,8 +166,8 @@ class GeminiMetaGenerator {
         val prompt = finalTemplate
             .replace("[URL]", videoUrl)
             .replace("[WHISPER_TEXT]", transcription)
-            .replace("$videoInfo", videoInfo)
-            .replace("$whisperError", whisperError)
+            .replace("[VIDEO_INFO]", videoInfo)
+            .replace("[ERROR]", whisperError)
 
         val request: Request
         if (aiPlatform == "HuggingFace") {
