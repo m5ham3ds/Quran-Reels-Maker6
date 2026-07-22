@@ -1913,7 +1913,8 @@ fun PopularClipsScreen(
                                                 title = result.title,
                                                 surah = result.surah,
                                                 ayahStart = result.startAyah,
-                                                ayahEnd = result.endAyah
+                                                ayahEnd = result.endAyah,
+                                                category = result.category
                                             )
                                             
                                             val index = baseClipsList.indexOfFirst { it.id == clipInfo.id }

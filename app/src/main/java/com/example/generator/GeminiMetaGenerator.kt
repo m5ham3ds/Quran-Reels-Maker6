@@ -205,7 +205,6 @@ class GeminiMetaGenerator {
                     })
                 })
                 put("generationConfig", JSONObject().apply {
-                    put("response_mime_type", "application/json")
                     put("temperature", 0.2)
                 })
             }
@@ -256,12 +255,12 @@ class GeminiMetaGenerator {
                     return@withContext ClipAnalysisResult(
                         relevance = 1.0f,
                         analysis = "OK",
-                        surah = jsonOutput.optInt("surah", 1),
-                        startAyah = jsonOutput.optInt("startAyah", 1),
-                        endAyah = jsonOutput.optInt("endAyah", 5),
-                        reciterName = jsonOutput.optString("reciterName", "غير معروف"),
-                        title = jsonOutput.optString("title", "تلاوة خاشعة"),
-                        category = jsonOutput.optString("category", "سكينة")
+                        surah = jsonOutput.optInt("surah", jsonOutput.optInt("SURAH", 1)),
+                        startAyah = jsonOutput.optInt("startAyah", jsonOutput.optInt("START", 1)),
+                        endAyah = jsonOutput.optInt("endAyah", jsonOutput.optInt("END", 5)),
+                        reciterName = jsonOutput.optString("reciterName", jsonOutput.optString("RECITER", "غير معروف")),
+                        title = jsonOutput.optString("title", jsonOutput.optString("TITLE", "تلاوة خاشعة")),
+                        category = jsonOutput.optString("category", jsonOutput.optString("CATEGORY", "سكينة"))
                     )
                 } catch (e: Exception) {
                     try {
