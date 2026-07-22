@@ -584,24 +584,53 @@ fun SettingsScreen(
                                                 chain.proceed(requestBuilder.build())
                                             }
                                             .build()
-                                        val modelToUse = geminiModel.trim()
-                                        val url = "https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${currentGeminiKey.trim()}"
-                                        com.example.generator.SystemDiagnosticTracker.addLog("AUTOFILL", "الرابط المطلوب: $url")
-                                        val jsonReq = JSONObject().apply {
-                                            put("contents", org.json.JSONArray().apply {
-                                                put(JSONObject().apply {
-                                                    put("parts", org.json.JSONArray().apply {
-                                                        put(JSONObject().apply {
-                                                            put("text", backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." })
+                                        
+                                        val request: Request
+                                        if (aiPlatform == "HuggingFace") {
+                                            val hfKey = huggingfaceKey.trim()
+                                            if (hfKey.isBlank()) throw Exception("HuggingFace API key is missing")
+                                            val hfModel = huggingfaceModel.ifBlank { "Qwen/Qwen2.5-72B-Instruct" }.trim()
+                                            val hfUrl = "https://api-inference.huggingface.co/models/$hfModel/v1/chat/completions"
+                                            com.example.generator.SystemDiagnosticTracker.addLog("AUTOFILL", "الرابط المطلوب: $hfUrl")
+                                            val jsonReq = JSONObject().apply {
+                                                put("model", hfModel)
+                                                put("messages", org.json.JSONArray().apply {
+                                                    put(JSONObject().apply {
+                                                        put("role", "system")
+                                                        put("content", "You must reply ONLY with a comma-separated list of strings.")
+                                                    })
+                                                    put(JSONObject().apply {
+                                                        put("role", "user")
+                                                        put("content", backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." })
+                                                    })
+                                                })
+                                            }
+                                            request = Request.Builder()
+                                                .url(hfUrl)
+                                                .header("Authorization", "Bearer $hfKey")
+                                                .post(jsonReq.toString().toRequestBody("application/json".toMediaTypeOrNull()))
+                                                .build()
+                                        } else {
+                                            val modelToUse = geminiModel.trim()
+                                            val url = "https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${currentGeminiKey.trim()}"
+                                            com.example.generator.SystemDiagnosticTracker.addLog("AUTOFILL", "الرابط المطلوب: $url")
+                                            val jsonReq = JSONObject().apply {
+                                                put("contents", org.json.JSONArray().apply {
+                                                    put(JSONObject().apply {
+                                                        put("parts", org.json.JSONArray().apply {
+                                                            put(JSONObject().apply {
+                                                                put("text", backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." })
+                                                            })
                                                         })
                                                     })
                                                 })
-                                            })
+                                            }
+                                            request = Request.Builder()
+                                                .url(url)
+                                                .post(jsonReq.toString().toRequestBody("application/json".toMediaTypeOrNull()))
+                                                .build()
                                         }
-                                        val request = Request.Builder()
-                                            .url(url)
-                                            .post(jsonReq.toString().toRequestBody("application/json".toMediaTypeOrNull()))
-                                            .build()
+
                                         var attempt = 0
                                         var success = false
                                         while (attempt < 3 && !success) {
@@ -610,7 +639,7 @@ fun SettingsScreen(
                                             if (response.isSuccessful) {
                                                 val body = response.body?.string() ?: ""
                                                 val root = JSONObject(body)
-                                                val textStr = root.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+                                                val textStr = if (aiPlatform == "HuggingFace") root.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content") else root.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
                                                 val newSet = backgroundKeywords.toMutableSet()
                                                 textStr.split(",").forEach {
                                                     val trimmed = it.trim().removeSurrounding("\"").removeSurrounding("'").removeSurrounding("\n")
@@ -626,7 +655,7 @@ fun SettingsScreen(
                                                 attempt++
                                                 if (attempt >= 3) {
                                                     withContext(Dispatchers.Main) {
-                                                        android.widget.Toast.makeText(context, if (isArabic) "لقد استنفذت الحد المسموح أو السيرفر مشغول (429/503). أضف مفتاح API الخاص بك." else "Rate limit or overloaded (429/503). Enter your own Gemini API Key.", android.widget.Toast.LENGTH_LONG).show()
+                                                        android.widget.Toast.makeText(context, if (isArabic) "لقد استنفذت الحد المسموح أو السيرفر مشغول (429/503). أضف مفتاح API الخاص بك." else "Rate limit or overloaded (429/503). Enter your own API Key.", android.widget.Toast.LENGTH_LONG).show()
                                                     }
                                                 }
                                                 kotlinx.coroutines.delay(2000L * attempt)
@@ -635,11 +664,6 @@ fun SettingsScreen(
                                                 if (response.code == 403) {
                                                     withContext(Dispatchers.Main) {
                                                         android.widget.Toast.makeText(context, if (isArabic) "مفتاح API محظور أو تم تسريبه (خطأ 403). يرجى إنشاء مفتاح جديد." else "API key blocked or leaked (403). Please get a new one.", android.widget.Toast.LENGTH_LONG).show()
-                                                    }
-                                                }
-                                                if (response.code == 403) {
-                                                    withContext(Dispatchers.Main) {
-                                                        android.widget.Toast.makeText(context, if (isArabic) "مفتاح API محظور أو تم تسريبه (خطأ 403). يرجى تغييره من Google AI Studio." else "API key blocked or leaked (403). Please get a new one.", android.widget.Toast.LENGTH_LONG).show()
                                                     }
                                                 }
                                                 com.example.generator.SystemDiagnosticTracker.addLog("ERROR", "فشل الاتصال: رمز الاستجابة ${response.code}، التفاصيل: $errorBody")
