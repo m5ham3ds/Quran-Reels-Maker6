@@ -217,86 +217,103 @@ class GeminiMetaGenerator {
                 .build()
         }
         
-        try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val responseStr = response.body?.string() ?: ""
-                val rootJson = JSONObject(responseStr)
-                
-                var rawText = ""
-                if (aiPlatform == "HuggingFace") {
-                    val choices = rootJson.optJSONArray("choices")
-                    if (choices != null && choices.length() > 0) {
-                        val message = choices.getJSONObject(0).optJSONObject("message")
-                        rawText = message?.optString("content", "")?.trim() ?: ""
-                    }
-                } else {
-                    val candidates = rootJson.optJSONArray("candidates")
-                    if (candidates != null && candidates.length() > 0) {
-                        val candidate = candidates.getJSONObject(0)
-                        val contentObj = candidate.getJSONObject("content")
-                        val parts = contentObj.getJSONArray("parts")
-                        if (parts.length() > 0) {
-                            rawText = parts.getJSONObject(0).getString("text").trim()
+        var attempt = 0
+        var success = false
+        var lastResult: ClipAnalysisResult? = null
+
+        while (attempt < 3 && !success) {
+            if (attempt > 0) kotlinx.coroutines.delay(2000L * attempt)
+            try {
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val responseStr = response.body?.string() ?: ""
+                    val rootJson = JSONObject(responseStr)
+                    
+                    var rawText = ""
+                    if (aiPlatform == "HuggingFace") {
+                        val choices = rootJson.optJSONArray("choices")
+                        if (choices != null && choices.length() > 0) {
+                            val message = choices.getJSONObject(0).optJSONObject("message")
+                            rawText = message?.optString("content", "")?.trim() ?: ""
+                        }
+                    } else {
+                        val candidates = rootJson.optJSONArray("candidates")
+                        if (candidates != null && candidates.length() > 0) {
+                            val candidate = candidates.getJSONObject(0)
+                            val contentObj = candidate.getJSONObject("content")
+                            val parts = contentObj.getJSONArray("parts")
+                            if (parts.length() > 0) {
+                                rawText = parts.getJSONObject(0).getString("text").trim()
+                            }
                         }
                     }
-                }
-                
-                SystemDiagnosticTracker.addLog("AI", "Raw AI Response: $rawText")
-                
-                if (rawText.startsWith("```json")) {
-                    rawText = rawText.substringAfter("```json").substringBeforeLast("```").trim()
-                } else if (rawText.startsWith("```")) {
-                    rawText = rawText.substringAfter("```").substringBeforeLast("```").trim()
-                }
-                
-                try {
-                    val jsonOutput = JSONObject(rawText)
-                    return@withContext ClipAnalysisResult(
-                        relevance = 1.0f,
-                        analysis = "OK",
-                        surah = jsonOutput.optInt("surah", jsonOutput.optInt("SURAH", 1)),
-                        startAyah = jsonOutput.optInt("startAyah", jsonOutput.optInt("START", 1)),
-                        endAyah = jsonOutput.optInt("endAyah", jsonOutput.optInt("END", 5)),
-                        reciterName = jsonOutput.optString("reciterName", jsonOutput.optString("RECITER", "غير معروف")),
-                        title = jsonOutput.optString("title", jsonOutput.optString("TITLE", "تلاوة خاشعة")),
-                        category = jsonOutput.optString("category", jsonOutput.optString("CATEGORY", "سكينة"))
-                    )
-                } catch (e: Exception) {
+                    
+                    SystemDiagnosticTracker.addLog("AI", "Raw AI Response: $rawText")
+                    
+                    if (rawText.startsWith("```json")) {
+                        rawText = rawText.substringAfter("```json").substringBeforeLast("```").trim()
+                    } else if (rawText.startsWith("```")) {
+                        rawText = rawText.substringAfter("```").substringBeforeLast("```").trim()
+                    }
+                    
                     try {
-                        val surah = Regex("\\[SURAH\\](.*?)\\[/SURAH\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 1
-                        val start = Regex("\\[START\\](.*?)\\[/START\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 1
-                        val end = Regex("\\[END\\](.*?)\\[/END\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 5
-                        val reciter = Regex("\\[RECITER\\](.*?)\\[/RECITER\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "غير معروف"
-                        val title = Regex("\\[TITLE\\](.*?)\\[/TITLE\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "تلاوة خاشعة"
-                        val category = Regex("\\[CATEGORY\\](.*?)\\[/CATEGORY\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "سكينة"
-                        
+                        val jsonOutput = JSONObject(rawText)
                         return@withContext ClipAnalysisResult(
                             relevance = 1.0f,
                             analysis = "OK",
-                            surah = surah,
-                            startAyah = start,
-                            endAyah = end,
-                            reciterName = reciter,
-                            title = title,
-                            category = category
+                            surah = jsonOutput.optInt("surah", jsonOutput.optInt("SURAH", 1)),
+                            startAyah = jsonOutput.optInt("startAyah", jsonOutput.optInt("START", 1)),
+                            endAyah = jsonOutput.optInt("endAyah", jsonOutput.optInt("END", 5)),
+                            reciterName = jsonOutput.optString("reciterName", jsonOutput.optString("RECITER", "غير معروف")),
+                            title = jsonOutput.optString("title", jsonOutput.optString("TITLE", "تلاوة خاشعة")),
+                            category = jsonOutput.optString("category", jsonOutput.optString("CATEGORY", "سكينة"))
                         )
-                    } catch (regexError: Exception) {
-                        SystemDiagnosticTracker.addLog("AI", "❌ خطأ في تحليل استجابة الذكاء الاصطناعي: ${e.message}")
-                        return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "فشل تحليل معلومات المقطع من الذكاء الاصطناعي")
+                    } catch (e: Exception) {
+                        try {
+                            val surah = Regex("\\[SURAH\\](.*?)\\[/SURAH\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 1
+                            val start = Regex("\\[START\\](.*?)\\[/START\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 1
+                            val end = Regex("\\[END\\](.*?)\\[/END\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim()?.toIntOrNull() ?: 5
+                            val reciter = Regex("\\[RECITER\\](.*?)\\[/RECITER\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "غير معروف"
+                            val title = Regex("\\[TITLE\\](.*?)\\[/TITLE\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "تلاوة خاشعة"
+                            val category = Regex("\\[CATEGORY\\](.*?)\\[/CATEGORY\\]", RegexOption.DOT_MATCHES_ALL).find(rawText)?.groupValues?.get(1)?.trim() ?: "سكينة"
+                            
+                            return@withContext ClipAnalysisResult(
+                                relevance = 1.0f,
+                                analysis = "OK",
+                                surah = surah,
+                                startAyah = start,
+                                endAyah = end,
+                                reciterName = reciter,
+                                title = title,
+                                category = category
+                            )
+                        } catch (regexError: Exception) {
+                            SystemDiagnosticTracker.addLog("AI", "❌ خطأ في تحليل استجابة الذكاء الاصطناعي: ${e.message}")
+                            lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "فشل تحليل معلومات المقطع من الذكاء الاصطناعي")
+                            break // Fatal parsing error, no retry
+                        }
+                    }
+                } else {
+                    val errorBody = response.body?.string() ?: ""
+                    SystemDiagnosticTracker.addLog("AI", "HTTP Error ${response.code}: $errorBody")
+                    if (response.code == 429 || response.code == 503) {
+                        attempt++
+                        SystemDiagnosticTracker.addLog("AI", "إعادة المحاولة بسبب الخطأ ${response.code} (محاولة $attempt)")
+                        lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - ${if (response.code == 503) "النموذج يواجه ضغطاً كبيراً، يرجى المحاولة لاحقاً أو تغيير النموذج" else "تم استنفاد الحد الأقصى"}")
+                        continue
+                    } else {
+                        lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - غير معروف")
+                        break // Other HTTP error, no retry
                     }
                 }
-            } else {
-                val errorBody = response.body?.string() ?: ""
-                SystemDiagnosticTracker.addLog("AI", "HTTP Error ${response.code}: $errorBody")
-                return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "حدث خطأ في الاستجابة: ${response.code} - ${if (response.code == 503) "النموذج يواجه ضغطاً كبيراً، يرجى المحاولة لاحقاً أو تغيير النموذج" else "غير معروف"}")
+            } catch (e: Exception) {
+                SystemDiagnosticTracker.addLog("AI", "Error calling AI: ${e.message}")
+                com.example.utils.AppLogger.e("ExceptionCatch", "Exception caught: ${ e.message }", e)
+                lastResult = ClipAnalysisResult(relevance = 0f, analysis = "", error = "خطأ في الاتصال بالذكاء الاصطناعي: ${e.message}")
+                attempt++ // Network error, try again
             }
-        } catch (e: Exception) {
-            SystemDiagnosticTracker.addLog("AI", "Error calling AI: ${e.message}")
-            com.example.utils.AppLogger.e("ExceptionCatch", "Exception caught: ${ e.message }", e)
-            return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "خطأ في الاتصال بالذكاء الاصطناعي: ${e.message}")
         }
         
-        return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "لم يتم الحصول على أي معلومات")
+        return@withContext lastResult ?: ClipAnalysisResult(relevance = 0f, analysis = "", error = "لم يتم الحصول على أي معلومات")
     }
 }

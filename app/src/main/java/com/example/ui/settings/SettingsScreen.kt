@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -72,11 +73,12 @@ fun SettingsScreen(
     val videoQuality by settingsManager.videoQuality.collectAsState(initial = "Ultra")
     val videoFps by settingsManager.videoFps.collectAsState(initial = 30)
     val backgroundKeywords by settingsManager.backgroundKeywords.collectAsState(initial = emptySet())
-
+    val backgroundKeywordsPrompt by settingsManager.backgroundKeywordsPrompt.collectAsState(initial = "")
     val isArabic = language == "ar"
     
     var showInlineDiagnostics by remember { mutableStateOf(false) }
     var logsList by remember { mutableStateOf(emptyList<String>()) }
+    var showKeywordPromptDialog by remember { mutableStateOf(false) }
     
     LaunchedEffect(showInlineDiagnostics) {
         if (showInlineDiagnostics) {
@@ -545,9 +547,13 @@ fun SettingsScreen(
                             Spacer(Modifier.width(6.dp))
                             Text(if (isArabic) "حذف الكل" else "Clear All")
                         }
-
-                        Button(
-                            enabled = !isGenerating,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                enabled = !isGenerating,
                             onClick = {
                                 if (isGenerating) return@Button
                                 val currentGeminiKey = if (geminiKey.isNotBlank()) geminiKey else com.example.BuildConfig.GEMINI_API_KEY
@@ -579,7 +585,7 @@ fun SettingsScreen(
                                                 put(JSONObject().apply {
                                                     put("parts", org.json.JSONArray().apply {
                                                         put(JSONObject().apply {
-                                                            put("text", "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings.")
+                                                            put("text", backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." })
                                                         })
                                                     })
                                                 })
@@ -608,12 +614,12 @@ fun SettingsScreen(
                                                 }
                                                 com.example.generator.SystemDiagnosticTracker.addLog("AUTOFILL", "نجاح! تم جلب الكلمات وتحديث القائمة. النص المسترجع: $textStr")
                                                 success = true
-                                            } else if (response.code == 429) {
+                                            } else if (response.code == 429 || response.code == 503) {
                                                 com.example.generator.SystemDiagnosticTracker.addLog("ERROR", "تم استنفاد الحد الأقصى (429 Too Many Requests). المحاولة $attempt...")
                                                 attempt++
                                                 if (attempt >= 3) {
                                                     withContext(Dispatchers.Main) {
-                                                        android.widget.Toast.makeText(context, if (isArabic) "لقد استنفذت الحد المسموح (خطأ 429). أضف مفتاح API الخاص بك." else "Rate limit reached (429). Enter your own Gemini API Key.", android.widget.Toast.LENGTH_LONG).show()
+                                                        android.widget.Toast.makeText(context, if (isArabic) "لقد استنفذت الحد المسموح أو السيرفر مشغول (429/503). أضف مفتاح API الخاص بك." else "Rate limit or overloaded (429/503). Enter your own Gemini API Key.", android.widget.Toast.LENGTH_LONG).show()
                                                     }
                                                 }
                                                 kotlinx.coroutines.delay(2000L * attempt)
@@ -635,7 +641,8 @@ fun SettingsScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x334CAF50), contentColor = Color(0xFF81C784)),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             if (isGenerating) {
                                 CircularProgressIndicator(color = Color(0xFF81C784), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -644,6 +651,14 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.width(6.dp))
                             Text(if (isArabic) "توليد بالذكاء الاصطناعي" else "AI Auto Fill")
+                        }
+                        
+                        IconButton(
+                            onClick = { showKeywordPromptDialog = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Prompt", tint = TextSoftColor)
+                        }
                         }
                     }
                 }
@@ -1010,5 +1025,51 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+    
+    if (showKeywordPromptDialog) {
+        var editablePrompt by remember { mutableStateOf(backgroundKeywordsPrompt.ifBlank { "Generate 10 English keywords or short phrases optimized for Pexels/Pixabay to find aesthetic cinematic, nature, atmospheric, and Islamic-themed background videos (e.g. 'islamic aesthetics kaaba mecca', 'dark cinematic aesthetic landscape', 'stormy rain window', 'stars night sky'). Return ONLY a comma-separated list of strings." }) }
+        
+        AlertDialog(
+            onDismissRequest = { showKeywordPromptDialog = false },
+            containerColor = CardBg,
+            title = {
+                Text(
+                    text = if (isArabic) "تعديل برومبت الكلمات المرجعية" else "Edit Background Keywords Prompt",
+                    color = LuxuryGold,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = editablePrompt,
+                    onValueChange = { editablePrompt = it },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LuxuryGold,
+                        unfocusedBorderColor = Color(0x33FFFFFF),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch { settingsManager.saveBackgroundKeywordsPrompt(editablePrompt) }
+                        showKeywordPromptDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = LuxuryGold)
+                ) {
+                    Text(if (isArabic) "حفظ" else "Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKeywordPromptDialog = false }) {
+                    Text(if (isArabic) "إلغاء" else "Cancel", color = TextSoftColor)
+                }
+            }
+        )
     }
 }
