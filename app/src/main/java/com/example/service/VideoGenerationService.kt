@@ -55,11 +55,11 @@ class VideoGenerationService : Service() {
         val action = intent.action
         if (action == "com.example.action.PAUSE_RESUME") {
             togglePauseResumed()
-            val language = kotlinx.coroutines.runBlocking {
-                com.example.settings.SettingsManager(this@VideoGenerationService).language.first()
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val language = com.example.settings.SettingsManager(this@VideoGenerationService).language.first()
+                val isArabic = language == "ar"
+                updateNotificationProgress(lastMessage, lastProgress, isArabic)
             }
-            val isArabic = language == "ar"
-            updateNotificationProgress(lastMessage, lastProgress, isArabic)
             return START_STICKY
         } else if (action == "com.example.action.CANCEL") {
             cancelGeneration()
@@ -82,17 +82,17 @@ class VideoGenerationService : Service() {
         val videoQuery = intent.getStringExtra("videoQuery")
 
         // 1. Show immediate Foreground Service Notification synchronously
-        val isArabicFast = kotlinx.coroutines.runBlocking {
-            com.example.settings.SettingsManager(this@VideoGenerationService).language.first() == "ar"
-        }
-        startForegroundServiceState(startAyah, endAyah, isArabicFast)
+        startForegroundServiceState(startAyah, endAyah, true)
 
         scope.launch {
             activeJob = coroutineContext[kotlinx.coroutines.Job]
             val currentJob = activeJob
+            var isArabicFast = false
             try {
                 val settingsManager = com.example.settings.SettingsManager(this@VideoGenerationService)
                 val includeBasmalah = settingsManager.includeBasmalah.first()
+                isArabicFast = settingsManager.language.first() == "ar"
+
                 val videoGenerator = VideoGenerator()
                 activeGenerator = videoGenerator
                 

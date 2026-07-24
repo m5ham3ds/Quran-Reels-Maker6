@@ -141,10 +141,14 @@ class ReelViewModel(application: Application) : AndroidViewModel(application) {
     private var currentReciterId: String = "ar.alafasy"
     private var currentVideoQuery: String? = null
 
-    private val _activeReciterId = MutableStateFlow(
-        runBlocking { com.example.settings.SettingsManager(getApplication()).activeGenerationReciterId.first() }
-    )
+    private val _activeReciterId = MutableStateFlow("ar.alafasy")
     val activeReciterId: StateFlow<String> = _activeReciterId
+
+    init {
+        viewModelScope.launch {
+            _activeReciterId.value = com.example.settings.SettingsManager(getApplication()).activeGenerationReciterId.first()
+        }
+    }
 
     fun resumeGeneration(context: Context) {
         generate(

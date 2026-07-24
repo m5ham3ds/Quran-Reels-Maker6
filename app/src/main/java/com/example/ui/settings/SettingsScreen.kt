@@ -564,7 +564,14 @@ fun SettingsScreen(
                             onClick = {
                                 if (isGenerating) return@Button
                                 val currentGeminiKey = if (geminiKey.isNotBlank()) geminiKey else com.example.BuildConfig.GEMINI_API_KEY
-                                if (currentGeminiKey.isBlank() || currentGeminiKey == "MY_GEMINI_API_KEY") return@Button
+                                if (aiPlatform == "Gemini" && (currentGeminiKey.isBlank() || currentGeminiKey == "MY_GEMINI_API_KEY")) {
+                                    scope.launch { android.widget.Toast.makeText(context, if (isArabic) "أضف مفتاح Gemini API" else "Add Gemini API Key", android.widget.Toast.LENGTH_SHORT).show() }
+                                    return@Button
+                                }
+                                if (aiPlatform == "HuggingFace" && huggingfaceKey.isBlank()) {
+                                    scope.launch { android.widget.Toast.makeText(context, if (isArabic) "أضف مفتاح HuggingFace" else "Add HuggingFace Key", android.widget.Toast.LENGTH_SHORT).show() }
+                                    return@Button
+                                }
                                 isGenerating = true
                                 showInlineDiagnostics = true
                                 com.example.generator.SystemDiagnosticTracker.addLog("AUTOFILL", "بدء عملية الملئ التلقائي للكلمات المرجعية...")

@@ -3198,7 +3198,7 @@ class VideoGenerator {
                 val arabicChunkTexts = mergedChunks.map { it.arabic }
                 englishChunkTexts = alignTranslationWithGemini(context, arabicChunkTexts, englishText)
                 if (englishChunkTexts != null && englishChunkTexts.size != mergedChunks.size) {
-                    SystemDiagnosticTracker.addLog("GEMINI", "تم رفض ترجمة Gemini لأن عدد الجمل لا يطابق")
+                    SystemDiagnosticTracker.addLog("AI", "تم رفض ترجمة Gemini لأن عدد الجمل لا يطابق")
                     englishChunkTexts = null
                 }
                 if (englishChunkTexts == null) {
@@ -3329,7 +3329,7 @@ class VideoGenerator {
         if (!englishText.isNullOrBlank() && refinedChunks.size > 1) {
             englishChunkTexts = alignTranslationWithGemini(context, arabicChunkTexts, englishText)
             if (englishChunkTexts != null && englishChunkTexts.size != refinedChunks.size) {
-                SystemDiagnosticTracker.addLog("GEMINI", "تم رفض ترجمة Gemini لأن عدد الجمل لا يطابق")
+                SystemDiagnosticTracker.addLog("AI", "تم رفض ترجمة Gemini لأن عدد الجمل لا يطابق")
                 englishChunkTexts = null
             }
             if (englishChunkTexts == null) {

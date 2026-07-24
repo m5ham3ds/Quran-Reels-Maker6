@@ -81,18 +81,18 @@ class GeminiMetaGenerator {
         
         val cacheFile = getCacheFile(context, videoUrl)
         if (skipWhisperX) {
-            SystemDiagnosticTracker.addLog("GEMINI", "ميزة تخطي WhisperX مفعلة. جاري فحص وجود معلومات مخزنة مسبقاً...")
+            SystemDiagnosticTracker.addLog("AI", "ميزة تخطي WhisperX مفعلة. جاري فحص وجود معلومات مخزنة مسبقاً...")
             if (cacheFile.exists()) {
                 try {
                     val cachedJson = JSONObject(cacheFile.readText())
                     transcription = cachedJson.optString("transcription", "")
                     videoInfo = cachedJson.optString("videoInfo", "")
-                    SystemDiagnosticTracker.addLog("GEMINI", "تم العثور على معلومات مخزنة! تخطي المعالجة الصوتية.")
+                    SystemDiagnosticTracker.addLog("AI", "تم العثور على معلومات مخزنة! تخطي المعالجة الصوتية.")
                 } catch (e: Exception) {
                     return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "بيانات مخزنة تالفة")
                 }
             } else {
-                SystemDiagnosticTracker.addLog("GEMINI", "❌ لم يتم العثور على أي معلومات مخزنة لهذا الرابط. إيقاف العملية.")
+                SystemDiagnosticTracker.addLog("AI", "❌ لم يتم العثور على أي معلومات مخزنة لهذا الرابط. إيقاف العملية.")
                 return@withContext ClipAnalysisResult(relevance = 0f, analysis = "", error = "ليست هناك اي معلومات لهذا الرابط. يرجى إيقاف ميزة التخطي وإعادة المحاولة.")
             }
         } else {
@@ -122,14 +122,14 @@ class GeminiMetaGenerator {
                     put("videoInfo", videoInfo)
                 }
                 cacheFile.writeText(cacheObj.toString())
-                SystemDiagnosticTracker.addLog("GEMINI", "تم حفظ معلومات الرابط في الذاكرة المؤقتة لاستخدامها لاحقاً.")
+                SystemDiagnosticTracker.addLog("AI", "تم حفظ معلومات الرابط في الذاكرة المؤقتة لاستخدامها لاحقاً.")
             } catch (e: Exception) {
                 whisperError = e.message ?: "Unknown"
                 SystemDiagnosticTracker.addLog("WHISPER", "فشل استخراج النصوص: ${e.message}")
             }
         }
 
-        SystemDiagnosticTracker.addLog("GEMINI", "تم جلب المعلومات بنجاح وإعدادها. جاري الانتقال إلى إرسال المعلومات والبرومبت الاحترافي إلى نموذج ذكاء اصطناعي...")
+        SystemDiagnosticTracker.addLog("AI", "تم جلب المعلومات بنجاح وإعدادها. جاري الانتقال إلى إرسال المعلومات والبرومبت الاحترافي إلى نموذج ذكاء اصطناعي...")
         
         val userPromptTemplate = settingsManager.geminiPrompt.first()
         val defaultTemplate = """
